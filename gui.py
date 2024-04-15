@@ -3,6 +3,7 @@ from tkinter import filedialog
 from Cryptodome.Cipher import AES
 from Cryptodome.Random import get_random_bytes
 import os
+from secure_delete import secure_delete
 
 def encrypt_folder():
     folder_path = filedialog.askdirectory(title="Select Folder to Jecryppt")
@@ -18,21 +19,24 @@ def encrypt_folder():
         result_label.config(text="Error: No folder has been selected.")
 def encrypt_file(file_path, key):
     # read the file content
-    with open(file_path, 'rb') as file:
-        plaintext = file.read()
+	with open(file_path, 'rb') as file:
+		plaintext = file.read()
 
     # make an aes cipher object
-    cipher = AES.new(key, AES.MODE_GCM)
+	cipher = AES.new(key, AES.MODE_GCM)
 
     # encrypt the file
-    ciphertext, tag = cipher.encrypt_and_digest(plaintext)
+	ciphertext, tag = cipher.encrypt_and_digest(plaintext)
 
-    # write the encrypted content back to the file
-    with open(file_path, 'wb') as file:
-        file.write(cipher.nonce)
-        file.write(tag)
-        file.write(ciphertext)
-          
+    #create the encrypted content in a new file
+
+	encrypted_file_path = file_path + ".encrypted"
+	with open(encrypted_file_path, 'wb') as file:
+		file.write(cipher.nonce)
+		file.write(tag)
+		file.write(ciphertext)
+	secure_delete(file_path)
+
 def encrypt_folder_contents(folder_path, key):
 	for root, dirs, files in os.walk(folder_path):
 		for file in files:
@@ -40,40 +44,45 @@ def encrypt_folder_contents(folder_path, key):
 			encrypt_file(file_path,key)
 def decrypt_file():
     # gotta get file pathway
-    file_path = filedialog.askopenfilename(title="Select File to Decrypt")
-    if file_path:
+	encrypted_file_path = filedialog.askopenfilename(title="Select File to Decrypt")
+	if encrypted_file_path:
         # needs user to impute key
-        key = key_entry.get().encode()
+		key = key_entry.get().encode()
         # pad key (256 bits)
-        key = key.ljust(32, b'\0')
-        print("Decryption Key:", key)
+		key = key.ljust(32, b'\0')
+		print("Decryption Key:", key)
 
         # read encrypted file content
-        with open(file_path, 'rb') as file:
-            nonce = file.read(16)
-            tag = file.read(16)
-            ciphertext = file.read()
+		with open(encrypted_file_path, 'rb') as file:
+			nonce = file.read(16)
+			tag = file.read(16)
+			ciphertext = file.read()
 
-        print("Nonce:", nonce)
-        print("Tag:", tag)
-        print("Ciphertext:", ciphertext)
+		print("Nonce:", nonce)
+		print("Tag:", tag)
+		print("Ciphertext:", ciphertext)
 
         # create aes cipher object
-        try:
-            cipher = AES.new(key, AES.MODE_GCM, nonce)
+		try:
+			cipher = AES.new(key, AES.MODE_GCM, nonce)
 
             # decrypt file content
-            plaintext = cipher.decrypt_and_verify(ciphertext, tag)
+			plaintext = cipher.decrypt_and_verify(ciphertext, tag)
 
-            # put decrypted back into file
-            with open(file_path, 'wb') as file:
-                file.write(plaintext)
-            result_label.config(text="I think I did it maybe..")
-        except ValueError as e:
-            print("Decryption Error:", str(e))
-            result_label.config(text="Mmmmm, thats not right, sorry.")
-    else:
-        result_label.config(text="Error: No file has been selected.")
+            # create new with original content and remove encrypted extention
+			decrypted_file_path = encrypted_file_path[:-10]
+			with open(decrypted_file_path, 'wb') as file:
+				file.write(plaintext)
+			#uses secure_delete to delete encrypted file
+			secure_delete(encrypted_file_path)
+
+			result_label.config(text="I think I did it maybe..")
+
+		except ValueError as e:
+			print("Decryption Error:", str(e))
+			result_label.config(text="Mmmmm, thats not right, sorry.")
+	else:
+		result_label.config(text="Error: No file has been selected.")
 #Tkinter Starts
 root = tk.Tk()
 root.title("Jecryppin")
